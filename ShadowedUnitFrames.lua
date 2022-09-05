@@ -351,6 +351,7 @@ function ShadowUF:LoadUnitDefaults()
 	self.defaults.profile.units.player.healthBar.predicted = true
 	self.defaults.profile.units.player.powerBar.predicted = true
 	self.defaults.profile.units.player.indicators.status.enabled = true
+	self.defaults.profile.units.player.runeBar = {enabled = false}
 	self.defaults.profile.units.player.totemBar = {enabled = false}
 	self.defaults.profile.units.player.druidBar = {enabled = false}
 	self.defaults.profile.units.player.xpBar = {enabled = false}
@@ -431,7 +432,7 @@ function ShadowUF:LoadUnitDefaults()
 	self.defaults.profile.units.raidpet.fader = {enabled = false, combatAlpha = 1.0, inactiveAlpha = 0.60}
 	self.defaults.profile.units.raidpet.combatText.enabled = false
 	-- MAINTANK
-	self.defaults.profile.units.maintank.roleFilter = "TANK"
+	-- self.defaults.profile.units.maintank.roleFilter = "TANK"
 	self.defaults.profile.units.maintank.groupFilter = "MAINTANK"
 	self.defaults.profile.units.maintank.groupBy = "GROUP"
 	self.defaults.profile.units.maintank.sortOrder = "ASC"
