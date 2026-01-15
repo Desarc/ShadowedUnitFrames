@@ -32,6 +32,7 @@ read_globals = {
 	"CopyTable",
 	"string.split",
 	"string.trim",
+	"string.utf8sub",
 	"table.wipe",
 	"time",
 
@@ -42,12 +43,12 @@ read_globals = {
 	"RealMobHealth",
 
 	-- API functions
+	"C_PartyInfo",
 	"C_Timer",
 	"CancelUnitBuff",
 	"CanHearthAndResurrectFromArea",
 	"CastingInfo",
 	"ChannelInfo",
-	"CheckInteractDistance",
 	"CreateFrame",
 	"GetArenaOpponentSpec",
 	"GetBuildInfo",
