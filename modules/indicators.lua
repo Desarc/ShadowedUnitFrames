@@ -79,8 +79,17 @@ end
 function Indicators:UpdateMasterLoot(frame)
 	if( not frame.indicators.masterLoot or not frame.indicators.masterLoot.enabled ) then return end
 
-	local lootType, partyID, raidID = GetLootMethod()
-	if( lootType ~= "master" ) then
+	local masterLoot, partyID, raidID
+	if C_PartyInfo and C_PartyInfo.GetLootMethod then
+		local lootType
+		lootType, partyID, raidID = C_PartyInfo.GetLootMethod()
+		masterLoot = (lootType == Enum.LootMethod.Masterlooter)
+	else
+		local lootType
+		lootType, partyID, raidID = GetLootMethod()
+		masterLoot = (lootType == "master")
+	end
+	if( not masterLoot ) then
 		frame.indicators.masterLoot:Hide()
 	elseif( ( partyID and partyID == 0 and UnitIsUnit(frame.unit, "player") ) or ( partyID and partyID > 0 and UnitIsUnit(frame.unit, ShadowUF.partyUnits[partyID]) ) or ( raidID and raidID > 0 and UnitIsUnit(frame.unit, ShadowUF.raidUnits[raidID]) ) ) then
 		frame.indicators.masterLoot:Show()
@@ -241,19 +250,6 @@ function Indicators:UpdateStatus(frame)
 	end
 end
 
--- Ready check fading once the check complete
-local function fadeReadyStatus(self, elapsed)
-	self.timeLeft = self.timeLeft - elapsed
-	self.ready:SetAlpha(self.timeLeft / self.startTime)
-
-	if( self.timeLeft <= 0 ) then
-		self:SetScript("OnUpdate", nil)
-
-		self.ready.status = nil
-		self.ready:Hide()
-	end
-end
-
 local FADEOUT_TIME = 6
 function Indicators:UpdateReadyCheck(frame, event)
 	if( not frame.indicators.ready or not frame.indicators.ready.enabled ) then return end
@@ -273,11 +269,12 @@ function Indicators:UpdateReadyCheck(frame, event)
 					hasTimer = true
 
 					f.fadeList[fadeFrame] = timeLeft - elapsed
-					fadeFrame:SetAlpha(f.fadeList[fadeFrame] / FADEOUT_TIME)
 
 					if( f.fadeList[fadeFrame] <= 0 ) then
 						f.fadeList[fadeFrame] = nil
 						fadeFrame:Hide()
+					else
+						fadeFrame:SetAlpha(f.fadeList[fadeFrame] / FADEOUT_TIME)
 					end
 				end
 
@@ -291,7 +288,7 @@ function Indicators:UpdateReadyCheck(frame, event)
 
 		-- Player never responded so they are AFK
 		if( frame.indicators.ready.status == "waiting" ) then
-			frame.indicators.ready:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+			frame.indicators.ready:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize)
 		end
 		return
 	end
@@ -305,11 +302,11 @@ function Indicators:UpdateReadyCheck(frame, event)
 	end
 
 	if( status == "ready" ) then
-		frame.indicators.ready:SetTexture(READY_CHECK_READY_TEXTURE)
+		frame.indicators.ready:SetAtlas(READY_CHECK_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize)
 	elseif( status == "notready" ) then
-		frame.indicators.ready:SetTexture(READY_CHECK_NOT_READY_TEXTURE)
+		frame.indicators.ready:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize)
 	elseif( status == "waiting" ) then
-		frame.indicators.ready:SetTexture(READY_CHECK_WAITING_TEXTURE)
+		frame.indicators.ready:SetAtlas(READY_CHECK_WAITING_TEXTURE, TextureKitConstants.IgnoreAtlasSize)
 	end
 
 	frame.indicators:SetScript("OnUpdate", nil)

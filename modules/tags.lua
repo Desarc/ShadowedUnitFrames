@@ -1,3 +1,5 @@
+local GetSpellName = C_Spell.GetSpellName
+
 local Tags = {afkStatus = {}, offlineStatus = {}, customEvents = {}, powerMap = {}, moduleKey = "tags"}
 local tagPool, functionPool, temp, regFontStrings, powerMap = {}, {}, {}, {}, Tags.powerMap
 local L = ShadowUF.L
@@ -368,7 +370,7 @@ end
 
 -- Name abbreviation
 local function abbreviateName(text)
-	return string.sub(text, 1, 1) .. "."
+	return (string.utf8sub or string.sub)(text, 1, 1) .. "."
 end
 
 Tags.abbrevCache = setmetatable({}, {
@@ -380,14 +382,14 @@ end})
 
 -- Going to have to start using an env wrapper for tags I think
 local Druid = {}
-Druid.CatForm = GetSpellInfo(768)
-Druid.MoonkinForm = GetSpellInfo(24858)
-Druid.TravelForm = GetSpellInfo(783)
-Druid.BearForm = GetSpellInfo(5487)
-Druid.TreeForm = GetSpellInfo(33891)
-Druid.AquaticForm = GetSpellInfo(1066)
-Druid.SwiftFlightForm = GetSpellInfo(40120)
-Druid.FlightForm = GetSpellInfo(33943)
+Druid.CatForm = GetSpellName(768)
+Druid.MoonkinForm = GetSpellName(24858)
+Druid.TravelForm = GetSpellName(783)
+Druid.BearForm = GetSpellName(5487)
+Druid.TreeForm = GetSpellName(33891)
+Druid.AquaticForm = GetSpellName(1066)
+Druid.SwiftFlightForm = GetSpellName(40120)
+Druid.FlightForm = GetSpellName(33943)
 ShadowUF.Druid = Druid
 
 Tags.defaultTags = {
@@ -698,7 +700,7 @@ Tags.defaultTags = {
 			return nil
 		end
 
-		local level = UnitLevel(unit)
+		local level = UnitLevel(unit) or 0
 		if( level < 0 and UnitClassification(unit) == "worldboss" ) then
 			return nil
 		end
@@ -720,7 +722,7 @@ Tags.defaultTags = {
 			return UnitBattlePetLevel(unit)
 		end
 
-		local level = UnitLevel(unit)
+		local level = UnitLevel(unit) or 0
 		return level > 0 and level or UnitClassification(unit) ~= "worldboss" and "??" or nil
 	end]],
 	["maxhp"] = [[function(unit, unitOwner) return ShadowUF:FormatLargeNumber(UnitHealthMax(unit)) end]],
@@ -1499,9 +1501,10 @@ local function loadAPIEvents()
 		["UnitIsPVPFreeForAll"]		= "PLAYER_FLAGS_CHANGED UNIT_FACTION",
 		["UnitCastingInfo"]			= "UNIT_SPELLCAST_START UNIT_SPELLCAST_STOP UNIT_SPELLCAST_FAILED UNIT_SPELLCAST_INTERRUPTED UNIT_SPELLCAST_DELAYED",
 		["UnitChannelInfo"]			= "UNIT_SPELLCAST_CHANNEL_START UNIT_SPELLCAST_CHANNEL_STOP UNIT_SPELLCAST_CHANNEL_INTERRUPTED UNIT_SPELLCAST_CHANNEL_UPDATE",
-		["UnitAura"]				= "UNIT_AURA",
-		["UnitBuff"]				= "UNIT_AURA",
-		["UnitDebuff"]				= "UNIT_AURA",
+		["GetAuraDataByIndex"]		= "UNIT_AURA",
+		["GetBuffDataByIndex"]		= "UNIT_AURA",
+		["GetDebuffDataByIndex"]	= "UNIT_AURA",
+		["UnitAuraBySpell"]			= "UNIT_AURA",
 		["UnitXPMax"]				= "UNIT_PET_EXPERIENCE PLAYER_XP_UPDATE PLAYER_LEVEL_UP",
 		["UnitGetTotalAbsorbs"]		= "UNIT_ABSORB_AMOUNT_CHANGED",
 		["UnitXP%("]				= "UNIT_PET_EXPERIENCE PLAYER_XP_UPDATE PLAYER_LEVEL_UP",

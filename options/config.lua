@@ -6,6 +6,9 @@ local L = ShadowUF.L
 
 ShadowUF.Config = Config
 
+local GetSpellName = C_Spell.GetSpellName
+local GetSpellTexture = C_Spell.GetSpellTexture
+
 --[[
 	The part that makes configuration a pain when you actually try is it gets unwieldly when you're adding special code to deal with
 	showing help for certain cases, swapping tabs etc that makes it work smoothly.
@@ -51,7 +54,7 @@ local PAGE_DESC = {
 	["filter"] = L["Simple aura filtering by whitelists and blacklists."],
 }
 local INDICATOR_NAMES = {["questBoss"] = L["Quest Boss"], ["leader"] = L["Leader / Assist"], ["lfdRole"] = L["Class Role"], ["masterLoot"] = L["Master Looter"], ["pvp"] = L["PvP Flag"], ["raidTarget"] = L["Raid Target"], ["ready"] = L["Ready Status"], ["role"] = L["Raid Role"], ["status"] = L["Combat Status"], ["class"] = L["Class Icon"], ["resurrect"] = L["Resurrect Status"], ["sumPending"] = L["Summon Pending"], ["phase"] = L["Other Party/Phase Status"], ["petBattle"] = L["Pet Battle"], ["arenaSpec"] = L["Arena Spec"]}
-local AREA_NAMES = {["arena"] = L["Arenas"],["none"] = L["Everywhere else"], ["party"] = L["Party instances"], ["pvp"] = L["Battleground"], ["raid"] = L["Raid instances"]}
+local AREA_NAMES = {["arena"] = L["Arenas"],["none"] = L["Everywhere else"], ["party"] = L["Party instances"], ["pvp"] = L["Battleground"], ["raid"] = L["Raid instances"], ["neighborhood"] = L["Neighborhood"]}
 local INDICATOR_DESC = {
 		["leader"] = L["Crown indicator for group leader or assistants."], ["lfdRole"] = L["Role the unit is playing."],
 		["masterLoot"] = L["Bag indicator for master looters."], ["pvp"] = L["PVP flag indicator, Horde for Horde flagged pvpers and Alliance for Alliance flagged pvpers."],
@@ -497,7 +500,7 @@ local function loadGeneralOptions()
 	}
 
 	local function validateSpell(info, spell)
-		if( spell and spell ~= "" and not GetSpellInfo(spell) ) then
+		if( spell and spell ~= "" and not GetSpellName(spell) ) then
 			return string.format(L["Invalid spell \"%s\" entered."], spell or "")
 		end
 
@@ -520,7 +523,7 @@ local function loadGeneralOptions()
 			text = L["Alternate Spell Name"]
 		end
 
-		local icon = select(3, GetSpellInfo(name))
+		local icon = name and GetSpellTexture(name)
 		if( not icon ) then
 			icon = "Interface\\Icons\\Inv_misc_questionmark"
 		end
@@ -748,6 +751,14 @@ local function loadGeneralOptions()
 								arg = "tooltipCombat",
 								width = "double",
 							},
+							bossmodCastNames = {
+								order = 3.1,
+								type = "toggle",
+								name = L["Use Boss Mod Cast Name overrides"],
+								desc = L["Use spell name overrides provided by boss mods (BigWigs) on the cast bars."],
+								arg = "bossmodSpellRename",
+								width = "double",
+							},
 							sep2 = {
 								order = 3.5,
 								type = "description",
@@ -948,7 +959,7 @@ local function loadGeneralOptions()
 								set = setColor,
 								get = function(info)
 									if( not ShadowUF.db.profile.bars.backgroundColor ) then
-										return {r = 0, g = 0, b = 0}
+										return 0, 0, 0
 									end
 
 									return getColor(info)
@@ -5209,7 +5220,8 @@ local function loadFilterOptions()
 		name = function(info)
 				local name = spellMap[info[#(info)]]
 				if tonumber(name) then
-					local spellName, _, icon = GetSpellInfo(name)
+					local spellName = GetSpellName(name)
+					local icon = GetSpellTexture(name)
 					name = string.format("|T%s:14:14:0:0|t %s (#%i)", icon or "Interface\\Icons\\Inv_misc_questionmark", spellName or L["Unknown"], name)
 				end
 				return name
@@ -5517,7 +5529,6 @@ local function loadFilterOptions()
 			none = filterTable,
 			pvp = filterTable,
 			arena = filterTable,
-			battleground = filterTable,
 			party = filterTable,
 			raid = filterTable,
 		}
@@ -6398,6 +6409,7 @@ local function loadVisibilityOptions()
 			arena = areaTable,
 			party = areaTable,
 			raid = areaTable,
+			neighborhood = areaTable,
 		},
 	}
 end
@@ -6438,7 +6450,7 @@ local function loadAuraIndicatorsOptions()
 		for name in pairs(ShadowUF.db.profile.auraIndicators.auras) do
 			if( tonumber(name) ) then
 				local spellID = name
-				name = GetSpellInfo(name) or L["Unknown"]
+				name = GetSpellName(name) or L["Unknown"]
 				auraList[name] = string.format("%s (#%i)", name, spellID)
 			else
 				auraList[name] = name
@@ -6515,11 +6527,11 @@ local function loadAuraIndicatorsOptions()
 		type = "group",
 		icon = function(info)
 			local aura = auraMap[info[#(info)]]
-			return tonumber(aura) and (select(3, GetSpellInfo(aura))) or nil
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
 		end,
 		name = function(info)
 			local aura = auraMap[info[#(info)]]
-			return tonumber(aura) and string.format("%s (#%i)", GetSpellInfo(aura) or "Unknown", aura) or aura
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
 		end,
 		hidden = function(info)
 			local group = groupMap[info[#(info) - 1]]
@@ -6894,11 +6906,11 @@ local function loadAuraIndicatorsOptions()
 		type = "group",
 		icon = function(info)
 			local aura = auraMap[info[#(info)]]
-			return tonumber(aura) and (select(3, GetSpellInfo(aura))) or nil
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
 		end,
 		name = function(info)
 			local aura = linkMap[info[#(info)]]
-			return tonumber(aura) and string.format("%s (#%i)", GetSpellInfo(aura) or "Unknown", aura) or aura
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
 		end,
 		args = {},
 	}
@@ -6907,11 +6919,11 @@ local function loadAuraIndicatorsOptions()
 		order = 1,
 		icon = function(info)
 			local aura = auraMap[info[#(info)]]
-			return tonumber(aura) and (select(3, GetSpellInfo(aura))) or nil
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
 		end,
 		name = function(info)
 			local aura = linkMap[info[#(info)]]
-			return tonumber(aura) and string.format("%s (#%i)", GetSpellInfo(aura) or "Unknown", aura) or aura
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
 		end,
 		hidden = function(info)
 			local aura = linkMap[info[#(info)]]
@@ -7198,7 +7210,7 @@ local function loadAuraIndicatorsOptions()
 							create = {
 								order = 3,
 								type = "execute",
-								name = L["Add aura"],
+								name = L["Add Aura"],
 								disabled = function(info) return not addAura.name or (not addAura.group and not addAura.custom) end,
 								func = function(info)
 									local group = string.trim(addAura.custom or "")
@@ -7208,8 +7220,8 @@ local function loadAuraIndicatorsOptions()
 									-- Don't overwrite an existing group, but don't tell them either, mostly because I don't want to add error reporting code
 									if( not ShadowUF.db.profile.auraIndicators.auras[addAura.name] ) then
 										-- Odds are, if they are saying to show it only if a buff is missing it's cause they want to know when their own class buff is not there
-										-- so will cheat it, and jump start it by storing the texture if we find it from GetSpellInfo directly
-										Indicators.auraConfig[addAura.name] = {indicator = "", group = group, iconTexture = select(3, GetSpellInfo(addAura.name)), priority = 0, r = 0, g = 0, b = 0}
+										-- so will cheat it, and jump start it by storing the texture if we find it from GetSpellTexture directly
+										Indicators.auraConfig[addAura.name] = {indicator = "", group = group, iconTexture = GetSpellTexture(addAura.name), priority = 0, r = 0, g = 0, b = 0}
 										writeAuraTable(addAura.name)
 
 										auraID = auraID + 1
@@ -7437,13 +7449,14 @@ local function loadAuraIndicatorsOptions()
 		type = "toggle",
 		icon = function(info)
 			local aura = auraMap[info[#(info)]]
-			return tonumber(aura) and (select(3, GetSpellInfo(aura))) or nil
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
 		end,
 		name = function(info)
 			local aura = tonumber(auraMap[info[#(info)]])
 			if( not aura ) then	return auraMap[info[#(info)]] end
 
-			local name, _, icon = GetSpellInfo(aura)
+			local name = GetSpellName(aura)
+			local icon = GetSpellTexture(aura)
 			if( not name ) then return name end
 
 			return "|T" .. icon .. ":18:18:0:0|t " .. name

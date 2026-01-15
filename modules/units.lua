@@ -248,6 +248,7 @@ local function SetVisibility(self)
 	local instanceType = select(2, IsInInstance()) or "none"
 	local playerSpec = GetSpecialization()
 	if( instanceType == "scenario" ) then instanceType = "party" end
+	if( instanceType == "interior" ) then instanceType = "neighborhood" end
 
 	-- Selectively disable modules
 	for _, module in pairs(ShadowUF.moduleOrder) do
@@ -642,7 +643,7 @@ local secureInitializeUnit = [[
 	end
 ]]
 
-local unitButtonTemplate = ClickCastHeader and (BackdropTemplateMixin and "ClickCastUnitTemplate,SUF_SecureUnitTemplate,BackdropTemplate" or "ClickCastUnitTemplate,SUF_SecureUnitTemplate") or (BackdropTemplateMixin and "SUF_SecureUnitTemplate,BackdropTemplate" or "SUF_SecureUnitTemplate")
+local unitButtonTemplate = ClickCastHeader and ("ClickCastUnitTemplate,SUF_SecureUnitTemplate,PingableUnitFrameTemplate,BackdropTemplate") or ("SUF_SecureUnitTemplate,PingableUnitFrameTemplate,BackdropTemplate")
 
 -- Header unit initialized
 local function initializeUnit(header, frameName)
@@ -728,9 +729,9 @@ function Units:CreateUnit(...)
 	frame.OnEnter = SUF_OnEnter
 	frame.OnLeave = SUF_OnLeave
 
-	frame:RegisterForClicks("AnyUp")
 	-- non-header frames don't set those, so we need to do it
 	if( not InCombatLockdown() and not frame:GetAttribute("isHeaderDriven") ) then
+		frame:RegisterForClicks("AnyUp")
 		frame:SetAttribute("*type1", "target")
 		frame:SetAttribute("*type2", "togglemenu")
 	end
@@ -889,7 +890,7 @@ function Units:SetHeaderAttributes(frame, type)
 		frame:SetAttribute("roleFilter", config.roleFilter)
 
 		if( config.groupBy == "CLASS" ) then
-			frame:SetAttribute("groupingOrder", "DEATHKNIGHT,DEMONHUNTER,DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR,MONK")
+			frame:SetAttribute("groupingOrder", "DEATHKNIGHT,DEMONHUNTER,DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR,MONK,EVOKER")
 			frame:SetAttribute("groupBy", "CLASS")
 		elseif( config.groupBy == "ASSIGNEDROLE" ) then
 			frame:SetAttribute("groupingOrder", "TANK,HEALER,DAMAGER,NONE")
@@ -960,7 +961,7 @@ function Units:LoadUnit(unit)
 		return
 	end
 
-	local frame = self:CreateUnit("Button", "SUFUnit" .. unit, petBattleFrame, BackdropTemplateMixin and "SecureUnitButtonTemplate,BackdropTemplate" or "SecureUnitButtonTemplate")
+	local frame = self:CreateUnit("Button", "SUFUnit" .. unit, petBattleFrame, "SecureUnitButtonTemplate,PingableUnitFrameTemplate,BackdropTemplate")
 	frame:SetAttribute("unit", unit)
 	frame.hasStateWatch = unit == "pet"
 
@@ -1188,7 +1189,7 @@ function Units:LoadZoneHeader(type)
 	end
 
 	for id, unit in pairs(ShadowUF[type .. "Units"]) do
-		local frame = self:CreateUnit("Button", "SUFHeader" .. type .. "UnitButton" .. id, headerFrame, BackdropTemplateMixin and "SecureUnitButtonTemplate,BackdropTemplate" or "SecureUnitButtonTemplate")
+		local frame = self:CreateUnit("Button", "SUFHeader" .. type .. "UnitButton" .. id, headerFrame, "SecureUnitButtonTemplate,PingableUnitFrameTemplate,BackdropTemplate")
 		frame.ignoreAnchor = true
 		frame.hasStateWatch = true
 		frame.unitUnmapped = type .. id
@@ -1304,7 +1305,7 @@ function Units:LoadChildUnit(parent, type, id)
 	end
 
 	-- Now we can create the actual frame
-	local frame = self:CreateUnit("Button", "SUFChild" .. type .. string.match(parent:GetName(), "(%d+)"), parent, BackdropTemplateMixin and "SecureUnitButtonTemplate,BackdropTemplate" or "SecureUnitButtonTemplate")
+	local frame = self:CreateUnit("Button", "SUFChild" .. type .. string.match(parent:GetName(), "(%d+)"), parent, "SecureUnitButtonTemplate,PingableUnitFrameTemplate,BackdropTemplate")
 	frame.unitType = type
 	frame.parent = parent
 	frame.isChildUnit = true
@@ -1460,6 +1461,7 @@ function Units:CheckPlayerZone(force)
 	-- CanHearthAndResurrectFromArea() returns true for world pvp areas, according to BattlefieldFrame.lua
 	local instance = CanHearthAndResurrectFromArea() and "pvp" or select(2, IsInInstance()) or "none"
 	if( instance == "scenario" ) then instance = "party" end
+	if( instance == "interior" ) then instance = "neighborhood" end
 
 	if( instance == instanceType and not force ) then return end
 	instanceType = instance
@@ -1486,10 +1488,11 @@ local curableSpells = {
 	["DRUID"] = {[88423] = {"Magic", "Curse", "Poison"}, [2782] = {"Curse", "Poison"}},
 	["PRIEST"] = {[527] = {"Magic", "Disease"}, [32375] = {"Magic"}, [213634] = {"Disease"}},
 	["PALADIN"] = {[4987] = {"Poison", "Disease", "Magic"}, [213644] = {"Poison", "Disease"}},
-	["SHAMAN"] = {[77130] = {"Curse", "Magic"}, [51886] = {"Curse"}},
+	["SHAMAN"] = {[77130] = {"Curse", "Magic"}, [51886] = {"Curse"}, [383013] = {"Poison"}},
 	["MONK"] = {[115450] = {"Poison", "Disease", "Magic"}, [218164] = {"Poison", "Disease"}},
 	["MAGE"] = {[475] = {"Curse"}},
 	["WARLOCK"] = {[89808] = {"Magic"}},
+	["EVOKER"] = {[365585] = {"Poison"}, [360823] = {"Magic", "Poison"}, [374251] = {"Poison", "Curse", "Disease"}}
 }
 
 curableSpells = curableSpells[playerClass]
@@ -1544,7 +1547,7 @@ centralFrame:SetScript("OnEvent", function(self, event, unit)
 		end
 
 	-- Monitor talent changes for curable changes
-	elseif( event == "PLAYER_SPECIALIZATION_CHANGED" or event == "UNIT_PET" ) then
+	elseif( event == "PLAYER_SPECIALIZATION_CHANGED" or event == "UNIT_PET" or event == "SPELLS_CHANGED") then
 		checkCurableSpells()
 
 		for frame in pairs(ShadowUF.Units.frameList) do
@@ -1560,6 +1563,7 @@ centralFrame:SetScript("OnEvent", function(self, event, unit)
 	elseif( event == "PLAYER_LOGIN" ) then
 		checkCurableSpells()
 		self:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+		self:RegisterEvent("SPELLS_CHANGED")
 		if( playerClass == "WARLOCK" ) then
 			self:RegisterUnitEvent("UNIT_PET", "player", nil)
 		end

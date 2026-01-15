@@ -5,7 +5,7 @@
 ShadowUF = select(2, ...)
 
 local L = ShadowUF.L
-ShadowUF.dbRevision = 62
+ShadowUF.dbRevision = 63
 ShadowUF.playerUnit = "player"
 ShadowUF.enabledUnits = {}
 ShadowUF.modules = {}
@@ -32,6 +32,7 @@ function ShadowUF:OnInitialize()
 			locked = false,
 			advanced = false,
 			tooltipCombat = false,
+			bossmodSpellRename = true,
 			omnicc = false,
 			blizzardcc = true,
 			tags = {},
@@ -39,7 +40,7 @@ function ShadowUF:OnInitialize()
 			positions = {},
 			range = {},
 			filters = {zonewhite = {}, zoneblack = {}, zoneoverride = {}, whitelists = {}, blacklists = {}, overridelists = {}},
-			visibility = {arena = {}, pvp = {}, party = {}, raid = {}},
+			visibility = {arena = {}, pvp = {}, party = {}, raid = {}, neighborhood = {}},
 			hidden = {cast = false, playerPower = true, buffs = false, party = true, raid = false, player = true, pet = true, target = true, focus = true, boss = true, arena = true, playerAltPower = false},
 		},
 	}
@@ -91,15 +92,22 @@ function ShadowUF:OnInitialize()
 end
 
 function ShadowUF.UnitAuraBySpell(unit, spell, filter)
-	local index = 0
-	while true do
-		index = index + 1
-		local name, _, _, _, _, _, _, _, _, spellID = UnitAura(unit, index, filter)
-		if not name then break end
-		if (type(spell) == "string" and spell == name) or (type(spell) == "number" and spell == spellID) then
-			return UnitAura(unit, index, filter)
+	local auraData
+	if type(spell) == "string" then
+		auraData = C_UnitAuras.GetAuraDataBySpellName(unit, spell, filter)
+	elseif type(spell) == "number" then
+		local index = 0
+		while true do
+			index = index + 1
+			local data = C_UnitAuras.GetAuraDataByIndex(unit, index, filter)
+			if not data then break end
+			if data.spellId == spell then
+				auraData = data
+				break
+			end
 		end
 	end
+	return AuraUtil.UnpackAuraData(auraData)
 end
 
 function ShadowUF:CheckBuild()
@@ -112,6 +120,12 @@ end
 
 function ShadowUF:CheckUpgrade()
 	local revision = self.db.profile.revision or self.dbRevision
+	if (revision <= 62 ) then
+		-- evoker setup
+		self.db.profile.classColors.EVOKER = {r = 0.20, g = 0.58, b = 0.50}
+		self.db.profile.powerColors.ESSENCE = {r = 0.40, g = 0.80, b = 1.00}
+		self.db.profile.units.player.essence = {enabled = true, anchorTo = "$parent", order = 60, height = 0.40, anchorPoint = "BR", x = -8, y = 6, size = 12, spacing = -2, growth = "LEFT", isBar = true, showAlways = true}
+	end
 	if (revision <= 61 ) then
 		if self.db.profile.bars.texture == "Smooth" then
 			self.db.profile.bars.texture = "Smoother"
@@ -247,6 +261,7 @@ function ShadowUF:LoadUnits()
 	-- CanHearthAndResurrectFromArea() returns true for world pvp areas, according to BattlefieldFrame.lua
 	local instanceType = CanHearthAndResurrectFromArea() and "pvp" or select(2, IsInInstance())
 	if( instanceType == "scenario" ) then instanceType = "party" end
+	if( instanceType == "interior" ) then instanceType = "neighborhood" end
 
 	if( not instanceType ) then instanceType = "none" end
 
@@ -362,6 +377,7 @@ function ShadowUF:LoadUnitDefaults()
 	self.defaults.profile.units.player.chi = {enabled = true, isBar = true}
 	self.defaults.profile.units.player.indicators.lfdRole = {enabled = true, size = 0, x = 0, y = 0}
 	self.defaults.profile.units.player.auraPoints = {enabled = false, isBar = true}
+	self.defaults.profile.units.player.essence = {enabled = true, isBar = true}
 	table.insert(self.defaults.profile.units.player.text, {enabled = true, text = "", anchorTo = "", anchorPoint = "C", size = 0, x = 0, y = 0, default = true})
 	table.insert(self.defaults.profile.units.player.text, {enabled = true, text = "", anchorTo = "", anchorPoint = "C", size = 0, x = 0, y = 0, default = true})
 	table.insert(self.defaults.profile.units.player.text, {enabled = true, text = "", anchorTo = "", anchorPoint = "C", size = 0, x = 0, y = 0, default = true})
@@ -574,7 +590,7 @@ end
 -- Module APIs
 function ShadowUF:RegisterModule(module, key, name, isBar, class, spec, level)
 	-- Prevent duplicate registration for deprecated plugin
-	if( key == "auraIndicators" and IsAddOnLoaded("ShadowedUF_Indicators") and self.modules.auraIndicators ) then
+	if( key == "auraIndicators" and C_AddOns.IsAddOnLoaded("ShadowedUF_Indicators") and self.modules.auraIndicators ) then
 		self:Print(L["WARNING! ShadowedUF_Indicators has been deprecated as v4 and is now built in. Please delete ShadowedUF_Indicators, your configuration will be saved."])
 		return
 	end
@@ -694,13 +710,25 @@ end
 local active_hiddens = {}
 function ShadowUF:HideBlizzardFrames()
 	if( self.db.profile.hidden.cast and not active_hiddens.cast ) then
-		hideBlizzardFrames(true, CastingBarFrame, PetCastingBarFrame)
+		hideBlizzardFrames(true, PlayerCastingBarFrame, PetCastingBarFrame)
 	end
 
 	if( self.db.profile.hidden.party and not active_hiddens.party ) then
-		for i=1, MAX_PARTY_MEMBERS do
-			local name = "PartyMemberFrame" .. i
-			hideBlizzardFrames(false, _G[name], _G[name .. "HealthBar"], _G[name .. "ManaBar"])
+		if( PartyFrame ) then
+			hideBlizzardFrames(false, PartyFrame)
+			for memberFrame in PartyFrame.PartyMemberFramePool:EnumerateActive() do
+				if memberFrame.HealthBarContainer and memberFrame.HealthBarContainer.HealthBar then
+					hideBlizzardFrames(false, memberFrame, memberFrame.HealthBarContainer.HealthBar, memberFrame.ManaBar)
+				else
+					hideBlizzardFrames(false, memberFrame, memberFrame.HealthBar, memberFrame.ManaBar)
+				end
+			end
+			PartyFrame.PartyMemberFramePool:ReleaseAll()
+		else
+			for i=1, MAX_PARTY_MEMBERS do
+				local name = "PartyMemberFrame" .. i
+				hideBlizzardFrames(false, _G[name], _G[name .. "HealthBar"], _G[name .. "ManaBar"])
+			end
 		end
 
 		-- This stops the compact party frame from being shown
@@ -741,11 +769,11 @@ function ShadowUF:HideBlizzardFrames()
 	end
 
 	if( self.db.profile.hidden.buffs and not active_hiddens.buffs ) then
-		hideBlizzardFrames(false, BuffFrame, TemporaryEnchantFrame)
+		hideBlizzardFrames(false, BuffFrame, DebuffFrame)
 	end
 
 	if( self.db.profile.hidden.player and not active_hiddens.player ) then
-		hideBlizzardFrames(false, PlayerFrame, PlayerFrameAlternateManaBar)
+		hideBlizzardFrames(false, PlayerFrame, AlternatePowerBar)
 
 		-- We keep these in case someone is still using the default auras, otherwise it messes up vehicle stuff
 		PlayerFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -759,7 +787,7 @@ function ShadowUF:HideBlizzardFrames()
 	end
 
 	if( self.db.profile.hidden.playerPower and not active_hiddens.playerPower ) then
-		basicHideBlizzardFrames(PriestBarFrame, RuneFrame, WarlockPowerFrame, MonkHarmonyBarFrame, PaladinPowerBarFrame, MageArcaneChargesFrame)
+		basicHideBlizzardFrames(RuneFrame, WarlockPowerFrame, MonkHarmonyBarFrame, PaladinPowerBarFrame, MageArcaneChargesFrame, EssencePlayerFrame)
 	end
 
 	if( self.db.profile.hidden.pet and not active_hiddens.pet ) then
@@ -775,19 +803,26 @@ function ShadowUF:HideBlizzardFrames()
 	end
 
 	if( self.db.profile.hidden.boss and not active_hiddens.boss ) then
+		hideBlizzardFrames(false, BossTargetFrameContainer)
+
 		for i=1, MAX_BOSS_FRAMES do
 			local name = "Boss" .. i .. "TargetFrame"
-			hideBlizzardFrames(false, _G[name], _G[name .. "HealthBar"], _G[name .. "ManaBar"])
+			if _G[name].TargetFrameContent then
+				if _G[name].TargetFrameContent.TargetFrameContentMain.HealthBarsContainer then
+					hideBlizzardFrames(false, _G[name], _G[name].TargetFrameContent.TargetFrameContentMain.HealthBarsContainer.HealthBar, _G[name].TargetFrameContent.TargetFrameContentMain.ManaBar)
+				else
+					hideBlizzardFrames(false, _G[name], _G[name].TargetFrameContent.TargetFrameContentMain.HealthBar, _G[name].TargetFrameContent.TargetFrameContentMain.ManaBar)
+				end
+			else
+				hideBlizzardFrames(false, _G[name], _G[name .. "HealthBar"], _G[name .. "ManaBar"])
+			end
 		end
 	end
 
-	if( self.db.profile.hidden.arena and not active_hiddens.arenaTriggered and IsAddOnLoaded("Blizzard_ArenaUI") and not InCombatLockdown() ) then
+	if( self.db.profile.hidden.arena and not active_hiddens.arenaTriggered ) then
 		active_hiddens.arenaTriggered = true
 
-		ArenaEnemyFrames:UnregisterAllEvents()
-		ArenaEnemyFrames:SetParent(self.hiddenFrame)
-		ArenaPrepFrames:UnregisterAllEvents()
-		ArenaPrepFrames:SetParent(self.hiddenFrame)
+		hideBlizzardFrames(true, ArenaEnemyFramesContainer, ArenaEnemyPrepFramesContainer, ArenaEnemyMatchFramesContainer)
 	end
 
 	if( self.db.profile.hidden.playerAltPower and not active_hiddens.playerAltPower ) then
@@ -898,7 +933,7 @@ SlashCmdList["SHADOWEDUF"] = function(msg)
 		return
 	end
 
-	local loaded, reason = LoadAddOn("ShadowedUF_Options")
+	local loaded, reason = C_AddOns.LoadAddOn("ShadowedUF_Options")
 	if( not ShadowUF.Config ) then
 		DEFAULT_CHAT_FRAME:AddMessage(string.format(L["Failed to load ShadowedUF_Options, cannot open configuration. Error returned: %s"], reason and _G["ADDON_" .. reason] or ""))
 		return
